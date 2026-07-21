@@ -34,12 +34,17 @@ judge-worker ──▶ Sandbox containers (Python / C++ / Java)
       │
       ▼
 Redis pub/sub ──▶ FastAPI WebSocket ──▶ React (live verdict push)
+
+Both api and judge-worker also expose /metrics (Prometheus), scraped
+into Grafana. Both emit structured JSON logs, correlatable by
+submission_id across the two processes.
 ```
 
-## Status: Phase 1 core is complete and independently verified. Phase 1 polish and Phase 2+ are not.
+## Status: Phase 1 core, observability, and automated tests are complete and independently verified. Deployment is not.
 
-This project is being built in phases, with a hard rule: the judge itself
-had to be fully working, tested, and secure before any AI work started.
+This project is being built in phases, with a hard rule: the judge
+itself had to be fully working, tested, and secure before any AI work
+started.
 
 **Done, and proven — not just asserted:**
 - Sandboxed execution for Python, C++, and Java, each with real
@@ -65,21 +70,29 @@ had to be fully working, tested, and secure before any AI work started.
 - A working frontend: auth flow, problem list/detail, a real Monaco
   editor wired to the live submit → judge → verdict loop, and a
   solved-count leaderboard
+- **Observability**: structured JSON logs (correlatable by
+  `submission_id` across the API and judge-worker processes), real
+  Prometheus metrics from both processes (request latency, judge
+  duration by language, submission counts by verdict, active sandbox
+  count, live queue length), visualized in Grafana
+- **Automated tests**: 21 passing — unit tests for sandbox security
+  limits and judge verdict logic (Python/C++/Java), plus integration
+  tests that hit the real running API end-to-end (register → submit →
+  poll → verdict), not just manual verification
 
 **Explicitly out of scope for now, pushed to after deployment:**
 - **Contest mode** (Phase 1.3 in the original plan) — time-boxed problem
-  sets with a live rank during the window. The `Contest` model already
-  exists in the schema, but nothing enforces submission windows or shows
-  a contest-scoped leaderboard yet. Deliberately sequenced after
-  deployment, not before it.
+  sets with a live rank during the window, admin-gated (same pattern as
+  Problems CRUD). The `Contest` model already exists in the schema, but
+  nothing enforces submission windows or shows a contest-scoped
+  leaderboard yet.
 
-**Explicitly deferred within Phase 1, not forgotten:** **Observability** — no structured logging or Prometheus/Grafana yet
-- **Automated test suite** — everything above was verified by hand
-  (adversarial scripts, curl sequences, real browser testing), not by a
-  CI-run test suite. That's a real gap for a production system, flagged
-  here rather than glossed over
-- **Deployment** — currently local-only via `docker compose`; no cloud
-  deploy yet
+**In progress:**
+- **Deployment** — currently local-only via `docker compose`. The
+  architecture requires genuine Docker socket access for the sandbox
+  (judge-worker spins up containers per submission), which rules out
+  most PaaS platforms; a real VM is required. Evaluating free/student
+  compute options now.
 
 **Not started at all:**
 - Phase 2 (AI mentor), Phase 3 (learning engine / recommendations),
@@ -91,13 +104,15 @@ had to be fully working, tested, and secure before any AI work started.
 - **Queue:** Celery + Redis (also used for WebSocket pub/sub)
 - **Sandboxing:** Docker, via a permission-scoped socket proxy
   ([Tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy))
+- **Observability:** Prometheus, Grafana, structured JSON logging
+- **Testing:** pytest (unit + integration)
 - **Frontend:** React (Vite), Tailwind v4, Monaco Editor, react-router
 - **Auth:** JWT (python-jose), bcrypt via passlib
 
 ## Running it locally
 
 ```bash
-# Backend + judging infra
+# Backend + judging infra + observability
 docker compose up -d --build
 docker compose exec api alembic upgrade head
 
@@ -107,12 +122,30 @@ npm install
 npm run dev
 ```
 
-API: `http://localhost:8000` · Frontend: `http://localhost:5173`
+- API: `http://localhost:8000`
+- Frontend: `http://localhost:5173`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin / see `docker-compose.yml`)
 
 Promoting a user to admin (no self-service endpoint, by design):
 ```bash
 docker compose exec postgres psql -U devmentor -d devmentor \
   -c "UPDATE users SET is_admin = true WHERE username = 'your_username';"
+```
+
+## Running the tests
+
+```bash
+pip install -r requirements.txt
+
+# Fast unit tests -- needs a Docker daemon, not the full stack
+pytest tests/unit -v
+
+# Integration tests -- needs the full compose stack running
+pytest tests/integration -v -m integration
+
+# Everything
+pytest -v
 ```
 
 ## Known trade-offs, stated plainly
@@ -130,11 +163,15 @@ docker compose exec postgres psql -U devmentor -d devmentor \
   intentional piece of schema drift, not an oversight.
 - Problem versioning tracks a version *number*, not full historical
   snapshots of past test case content.
+- The `active_sandboxes` metric approximates "judging operations in
+  flight," not an exact per-container count -- getting a fully precise
+  count would mean instrumenting `runner/sandbox.py` itself, which is
+  deliberately kept dependency-free so it still runs standalone on the
+  host without needing `prometheus_client` installed there.
 
 ## Roadmap
 
-Phase 1 polish (tests, observability, deployment) → Phase 1.3 (contest
-mode, scheduled for after deployment) → Phase 2 (AI mentor, as a fully
+Deployment → Phase 1.3 (contest mode) → Phase 2 (AI mentor, as a fully
 separate Celery queue/worker so a Claude API outage never blocks
 judging) → Phase 3 (learning recommendations) → Phase 5 (interview
 mode).
