@@ -1,1 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-bg: #12151b;
+  --color-surface: #1b1f27;
+  --color-border: #2a2f3a;
+  --color-text: #e4e7ec;
+  --color-text-muted: #8b93a3;
+  --color-accent: #33c9b0;
+
+  /* Verdict colors -- the actual signature element of this app. Always
+     paired with a text label elsewhere, never color alone, so this
+     stays legible for colorblind users too. */
+  --color-accepted: #34d399;
+  --color-wrong: #f87171;
+  --color-tle: #fbbf24;
+  --color-compile-error: #a78bfa;
+  --color-runtime-error: #fb923c;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  background-color: var(--color-bg);
+}

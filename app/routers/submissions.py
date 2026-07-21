@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 
 from celery import Celery
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +12,7 @@ from app.core.deps import get_current_user
 from app.models import Problem, Submission, User
 from app.schemas import SubmissionCreate, SubmissionOut
 
+logger = logging.getLogger("api")
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 ALLOWED_LANGUAGES = {"python", "cpp", "java"}
@@ -53,6 +55,14 @@ async def create_submission(
     # This is the actual "returns immediately" behavior: publishing to
     # Redis is fast, we don't wait for judging.
     _celery_client.send_task("judge_submission_task", args=[str(submission.id)])
+
+    logger.info(
+        "submission accepted",
+        extra={
+            "submission_id": str(submission.id),
+            "language": submission.language,
+        },
+    )
 
     return submission
 

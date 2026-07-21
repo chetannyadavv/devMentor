@@ -1,10 +1,15 @@
-from runner.judge import judge_single_case, judge_submission
+"""
+Unit tests for judge verdict logic (Java). Includes the memory test
+specifically, since Java's cgroup-aware JVM heap sizing behaves
+differently from Python/C++'s raw SIGKILL -- a real, worth-keeping
+distinction we found by hand earlier.
+"""
+from runner.judge import judge_single_case
 
 
-def test_java_accepted():
+def test_accepted():
     code = """
 import java.util.Scanner;
-
 public class Solution {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
@@ -15,11 +20,10 @@ public class Solution {
 }
 """
     result = judge_single_case(code, stdin_data="3 4", expected_output="7", language="java")
-    print("ACCEPTED case:", result["verdict"], result["stdout"])
     assert result["verdict"] == "ACCEPTED"
 
 
-def test_java_compile_error():
+def test_compile_error():
     code = """
 public class Solution {
     public static void main(String[] args) {
@@ -28,42 +32,37 @@ public class Solution {
 }
 """
     result = judge_single_case(code, stdin_data="", expected_output="anything", language="java")
-    print("COMPILE_ERROR case:", result["verdict"], result["stderr"][:100])
     assert result["verdict"] == "COMPILE_ERROR"
 
 
-def test_java_runtime_error():
+def test_runtime_error():
     code = """
 public class Solution {
     public static void main(String[] args) {
         int[] arr = new int[1];
-        System.out.println(arr[5]);  // ArrayIndexOutOfBoundsException
+        System.out.println(arr[5]);
     }
 }
 """
     result = judge_single_case(code, stdin_data="", expected_output="anything", language="java")
-    print("RUNTIME_ERROR case:", result["verdict"], "exit_code:", result["exit_code"])
     assert result["verdict"] == "RUNTIME_ERROR"
 
 
-def test_java_tle():
+def test_memory_limit_caught_by_jvm_heap():
+    # Java's memory ceiling shows up differently than Python/C++: the
+    # JVM is cgroup-aware and sizes its own heap accordingly, so this
+    # gets caught gracefully (OutOfMemoryError, clean exit) rather than
+    # an OS-level SIGKILL.
     code = """
 public class Solution {
     public static void main(String[] args) {
-        while (true) {}
+        byte[] data = new byte[800 * 1024 * 1024];
+        System.out.println("ALLOCATED 800MB");
     }
 }
 """
-    result = judge_single_case(
-        code, stdin_data="", expected_output="anything", language="java", timeout_seconds=3
-    )
-    print("TLE case:", result["verdict"], result["runtime_seconds"])
-    assert result["verdict"] == "TIME_LIMIT_EXCEEDED"
+    from runner.sandbox import run_java_submission
 
-
-if __name__ == "__main__":
-    test_java_accepted()
-    test_java_compile_error()
-    test_java_runtime_error()
-    test_java_tle()
-    print("\nALL JAVA JUDGE TESTS PASSED")
+    result = run_java_submission(code, stdin_data="", timeout_seconds=8, memory_mb=256)
+    assert "ALLOCATED 800MB" not in result["stdout"]
+    assert "OutOfMemoryError" in result["stderr"]

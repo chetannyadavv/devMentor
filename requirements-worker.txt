@@ -4,3 +4,4 @@ psycopg[binary]
 pydantic-settings
 celery[redis]
 docker
+prometheus_client

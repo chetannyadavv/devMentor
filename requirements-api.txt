@@ -12,3 +12,4 @@ pydantic-settings
 email-validator
 celery[redis]
 redis
+prometheus-fastapi-instrumentator

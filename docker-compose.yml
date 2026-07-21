@@ -73,6 +73,8 @@ services:
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       SUBMISSIONS_LOCAL_DIR: /workspaces
       SUBMISSIONS_HOST_DIR: ${PWD}/judge_workspaces
+    ports:
+      - "9100:9100"
     depends_on:
       - postgres
       - redis
@@ -82,5 +84,30 @@ services:
       - ./runner:/worker/runner:z
       - ./judge_workspaces:/workspaces:z
 
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:z
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+      - judge-worker
+
+  grafana:
+    image: grafana/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: devmentor_dev_password
+    volumes:
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:z
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
