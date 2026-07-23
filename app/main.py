@@ -14,6 +14,7 @@ from app.routers.problems import router as problems_router
 from app.routers.submissions import router as submissions_router
 from app.routers.ws import router as ws_router
 from app.routers.leaderboard import router as leaderboard_router
+from app.routers.contests import router as contests_router
 
 app = FastAPI(title="DevMentor API")
 
@@ -37,6 +38,7 @@ app.include_router(problems_router)
 app.include_router(submissions_router)
 app.include_router(ws_router)
 app.include_router(leaderboard_router)
+app.include_router(contests_router)
 
 
 @app.on_event("startup")

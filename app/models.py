@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime, Table
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime, Table, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
@@ -108,3 +108,21 @@ class Contest(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     problems = relationship("Problem", secondary=contest_problems)
+
+
+class TestCaseResult(Base):
+    __tablename__ = "test_case_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    submission_id = Column(UUID(as_uuid=True), ForeignKey("submissions.id"), nullable=False)
+    test_case_index = Column(Integer, nullable=False)
+    verdict = Column(String(30), nullable=False)
+    stdout = Column(Text)
+    stderr = Column(Text)
+    exit_code = Column(Integer)
+    runtime_seconds = Column(Float)
+    timed_out = Column(Boolean, nullable=False, default=False)
+    compile_error = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    submission = relationship("Submission")

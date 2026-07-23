@@ -1,12 +1,14 @@
 import uuid
+from collections import defaultdict
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import require_admin
-from app.models import Problem, TestCase, User
+from app.core.deps import require_admin, get_current_user_optional
+from app.models import Problem, TestCase, User, Contest, contest_problems
 from app.schemas import (
     ProblemCreate,
     ProblemOut,
@@ -17,6 +19,36 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/problems", tags=["problems"])
+
+
+async def _visible_problem_ids(db: AsyncSession) -> set | None:
+    """
+    Returns None if there's no filtering to do (fast path). Otherwise,
+    the set of problem IDs a non-admin is allowed to see: any problem
+    with no contest links at all, plus any problem linked to at least
+    one contest that has already started. A problem hidden ONLY because
+    every contest it belongs to hasn't started yet is excluded.
+    """
+    result = await db.execute(
+        select(contest_problems.c.problem_id, Contest.start_time).join(
+            Contest, Contest.id == contest_problems.c.contest_id
+        )
+    )
+    links = result.all()
+    if not links:
+        return None  # no contest-linked problems exist at all -- nothing to hide
+
+    now = datetime.now(timezone.utc)
+    starts_by_problem = defaultdict(list)
+    for problem_id, start_time in links:
+        starts_by_problem[problem_id].append(start_time)
+
+    hidden_ids = {
+        problem_id
+        for problem_id, starts in starts_by_problem.items()
+        if all(s > now for s in starts)
+    }
+    return hidden_ids  # returned as "hidden", inverted where used below
 
 
 @router.post("", response_model=ProblemOut, status_code=status.HTTP_201_CREATED)
@@ -37,17 +69,40 @@ async def create_problem(
 
 
 @router.get("", response_model=list[ProblemOut])
-async def list_problems(db: AsyncSession = Depends(get_db)):
+async def list_problems(
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     result = await db.execute(select(Problem))
-    return result.scalars().all()
+    problems = result.scalars().all()
+
+    is_admin = current_user is not None and current_user.is_admin
+    if is_admin:
+        return problems
+
+    hidden_ids = await _visible_problem_ids(db)
+    if hidden_ids is None:
+        return problems
+    return [p for p in problems if p.id not in hidden_ids]
 
 
 @router.get("/{slug}", response_model=ProblemDetail)
-async def get_problem(slug: str, db: AsyncSession = Depends(get_db)):
+async def get_problem(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     result = await db.execute(select(Problem).where(Problem.slug == slug))
     problem = result.scalar_one_or_none()
     if problem is None:
         raise HTTPException(status_code=404, detail="Problem not found")
+
+    is_admin = current_user is not None and current_user.is_admin
+    if not is_admin:
+        hidden_ids = await _visible_problem_ids(db)
+        if hidden_ids is not None and problem.id in hidden_ids:
+            # 404, not 403 -- don't reveal that a hidden problem exists.
+            raise HTTPException(status_code=404, detail="Problem not found")
 
     # Public view only ever shows sample test cases -- hidden cases used
     # for actual grading are never exposed here.

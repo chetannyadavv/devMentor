@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr
@@ -65,6 +66,31 @@ class TestCaseOut(BaseModel):
 
 class ProblemDetail(ProblemOut):
     sample_test_cases: list[TestCaseOut] = []
+
+
+class ContestCreate(BaseModel):
+    title: str
+    start_time: datetime
+    end_time: datetime
+    problem_slugs: list[str] = []
+
+
+class ContestOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    start_time: datetime
+    end_time: datetime
+    status: str  # "upcoming" | "active" | "ended" -- computed, not stored
+
+
+class ContestProblemOut(BaseModel):
+    id: uuid.UUID
+    slug: str
+    title: str
+
+
+class ContestDetail(ContestOut):
+    problems: list[ContestProblemOut] = []
 
 
 class SubmissionCreate(BaseModel):

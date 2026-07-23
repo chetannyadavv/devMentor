@@ -20,6 +20,7 @@ const VERDICT_COLOR = {
   TIME_LIMIT_EXCEEDED: "text-tle",
   COMPILE_ERROR: "text-compile-error",
   RUNTIME_ERROR: "text-runtime-error",
+  FAILED: "text-wrong", // overall verdict when any test case didn't pass
 };
 
 export default function SubmitPanel({ problemSlug }) {

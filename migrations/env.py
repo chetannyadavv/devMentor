@@ -19,9 +19,11 @@ def get_url():
         "DATABASE_URL",
         "postgresql://devmentor:devmentor_dev_password@postgres:5432/devmentor",
     )
-    # Migrations run synchronously -- strip the asyncpg driver marker so
-    # this uses plain psycopg2 instead of the app's async driver.
-    return url.replace("postgresql+asyncpg://", "postgresql://")
+    # Migrations run synchronously -- standardized on psycopg (v3)
+    # explicitly, same driver persistence.py already requires, rather
+    # than the implicit psycopg2 default and needing two sync drivers
+    # installed everywhere.
+    return url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
 
 
 def run_migrations_offline():
