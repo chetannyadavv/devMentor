@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import require_admin
+from app.core.deps import require_admin, get_current_user_optional
 from app.models import Contest, Problem, Submission, User, contest_problems
 from app.schemas import ContestCreate, ContestOut, ContestDetail, ContestProblemOut
 
@@ -66,26 +66,38 @@ async def list_contests(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{contest_id}", response_model=ContestDetail)
-async def get_contest(contest_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_contest(
+    contest_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     contest = await db.get(Contest, contest_id)
     if contest is None:
         raise HTTPException(status_code=404, detail="Contest not found")
 
-    result = await db.execute(
-        select(Problem)
-        .join(contest_problems, contest_problems.c.problem_id == Problem.id)
-        .where(contest_problems.c.contest_id == contest_id)
-    )
-    problems = result.scalars().all()
     now = datetime.now(timezone.utc)
+    contest_status = _status_for(contest, now)
+    is_admin = current_user is not None and current_user.is_admin
+
+    # Same visibility rule as /problems: non-admins can't see the
+    # problem set (not even titles) until the contest actually starts.
+    problems_out = []
+    if is_admin or contest_status != "upcoming":
+        result = await db.execute(
+            select(Problem)
+            .join(contest_problems, contest_problems.c.problem_id == Problem.id)
+            .where(contest_problems.c.contest_id == contest_id)
+        )
+        problems = result.scalars().all()
+        problems_out = [ContestProblemOut(id=p.id, slug=p.slug, title=p.title) for p in problems]
 
     return ContestDetail(
         id=contest.id,
         title=contest.title,
         start_time=contest.start_time,
         end_time=contest.end_time,
-        status=_status_for(contest, now),
-        problems=[ContestProblemOut(id=p.id, slug=p.slug, title=p.title) for p in problems],
+        status=contest_status,
+        problems=problems_out,
     )
 
 

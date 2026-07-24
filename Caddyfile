@@ -1,0 +1,17 @@
+{$DOMAIN} {
+    # API and WebSocket traffic goes to the api container.
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy api:8000
+    }
+    handle /ws/* {
+        reverse_proxy api:8000
+    }
+
+    # Everything else is the built frontend's static files.
+    handle {
+        root * /srv/frontend
+        try_files {path} /index.html
+        file_server
+    }
+}

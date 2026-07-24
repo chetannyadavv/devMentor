@@ -30,9 +30,9 @@ async def _visible_problem_ids(db: AsyncSession) -> set | None:
     every contest it belongs to hasn't started yet is excluded.
     """
     result = await db.execute(
-        select(contest_problems.c.problem_id, Contest.start_time).join(
-            Contest, Contest.id == contest_problems.c.contest_id
-        )
+        select(contest_problems.c.problem_id, Contest.start_time)
+        .select_from(contest_problems)
+        .join(Contest, Contest.id == contest_problems.c.contest_id)
     )
     links = result.all()
     if not links:

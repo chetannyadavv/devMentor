@@ -1,0 +1,24 @@
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    ports:
+      - "8000:8000"
+
+  judge-worker:
+    ports:
+      - "9100:9100"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3000:3000"

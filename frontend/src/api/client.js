@@ -1,5 +1,11 @@
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
+// In dev (npm run dev), talk directly to the local api container.
+// In production, the built files are served by Caddy on the same
+// origin, which proxies /api -- so a relative path works without
+// needing to know the real domain at build time.
+const API_BASE = import.meta.env.DEV ? "http://localhost:8000" : "/api";
+const WS_BASE = import.meta.env.DEV
+  ? "ws://localhost:8000"
+  : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
 
 export function getToken() {
   return localStorage.getItem("devmentor_token");

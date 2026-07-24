@@ -18,6 +18,14 @@ export default function Layout({ children }) {
             <Link to="/leaderboard" className="text-text-muted hover:text-text">
               Leaderboard
             </Link>
+            <Link to="/contests" className="text-text-muted hover:text-text">
+              Contests
+            </Link>
+            {user?.is_admin && (
+              <Link to="/admin" className="text-accent hover:underline">
+                Admin
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm">
