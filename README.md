@@ -169,6 +169,13 @@ pytest -v
   deliberately kept dependency-free so it still runs standalone on the
   host without needing `prometheus_client` installed there.
 
+## Recent updates
+
+- Automated test suite (21 tests) covering sandbox security, judge
+  verdict logic, and full API integration is passing consistently
+- Observability stack (Prometheus + Grafana) verified end-to-end with
+  structured JSON logs correlatable by `submission_id`
+
 ## Roadmap
 
 Deployment → Phase 1.3 (contest mode) → Phase 2 (AI mentor, as a fully
