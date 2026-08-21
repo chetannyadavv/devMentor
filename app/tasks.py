@@ -103,6 +103,14 @@ def judge_submission_task(submission_id: str):
             json.dumps({"submission_id": str(submission.id), "overall_verdict": result["overall_verdict"]}),
         )
 
+        # Enqueue AI feedback generation on a SEPARATE queue, consumed by
+        # a SEPARATE worker (ai-worker). This is the only thing
+        # judge-worker knows about the AI system -- a task name to call.
+        # It never imports Anthropic's SDK, never waits on a response,
+        # and judging is fully complete and already committed before
+        # this line even runs.
+        celery_app.send_task("generate_ai_feedback_task", args=[str(submission.id)], queue="ai_queue")
+
         return {"overall_verdict": result["overall_verdict"]}
     finally:
         session.close()

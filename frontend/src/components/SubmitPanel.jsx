@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import { api, submissionWsUrl } from "../api/client";
 
@@ -36,6 +36,24 @@ export default function SubmitPanel({ problemSlug }) {
     setCode(STARTER_CODE[lang]);
   }
 
+  function pollAiFeedback(submissionId) {
+    const interval = setInterval(async () => {
+      try {
+        const full = await api.get(`/submissions/${submissionId}`);
+        if (full.ai_feedback_status === "ready" || full.ai_feedback_status === "unavailable") {
+          setResult(full);
+          clearInterval(interval);
+        }
+      } catch {
+        clearInterval(interval);
+      }
+    }, 3000);
+    // Stop polling after a reasonable ceiling, in case something hangs
+    // -- feedback is a nice-to-have, never something worth polling
+    // forever over.
+    setTimeout(() => clearInterval(interval), 60000);
+  }
+
   async function handleSubmit() {
     setError(null);
     setResult(null);
@@ -59,6 +77,7 @@ export default function SubmitPanel({ problemSlug }) {
         setResult(full);
         setStatus("done");
         ws.close();
+        pollAiFeedback(submission.id);
       };
 
       ws.onerror = () => {
@@ -155,6 +174,25 @@ export default function SubmitPanel({ problemSlug }) {
               </div>
             ))}
           </div>
+
+          {result.ai_feedback_status === "ready" && (
+            <div className="mt-4 bg-surface border border-accent/40 rounded-lg p-4">
+              <span className="text-accent text-xs font-mono uppercase tracking-wide">
+                AI Mentor
+              </span>
+              <p className="text-text text-sm mt-2 leading-relaxed">{result.ai_feedback_text}</p>
+            </div>
+          )}
+          {result.ai_feedback_status === "pending" && (
+            <p className="text-text-muted font-mono text-xs mt-4 animate-pulse">
+              Generating feedback...
+            </p>
+          )}
+          {result.ai_feedback_status === "unavailable" && (
+            <p className="text-text-muted font-mono text-xs mt-4">
+              AI feedback isn't available for this submission right now.
+            </p>
+          )}
         </div>
       )}
     </div>

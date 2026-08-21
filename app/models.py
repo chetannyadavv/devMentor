@@ -94,6 +94,13 @@ class Submission(Base):
     overall_verdict = Column(String(30), nullable=True)  # null until judged
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # AI mentor feedback -- populated independently by ai-worker, never
+    # by judge-worker. "pending" until ai-worker picks it up, "ready"
+    # once feedback exists, "unavailable" if generation failed (e.g.
+    # Claude API down) -- judging itself is never blocked by any of this.
+    ai_feedback_status = Column(String(20), nullable=False, default="pending")
+    ai_feedback_text = Column(Text, nullable=True)
+
     user = relationship("User", back_populates="submissions")
     problem = relationship("Problem", back_populates="submissions")
 

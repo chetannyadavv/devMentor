@@ -105,4 +105,6 @@ async def get_submission(
         "overall_verdict": submission.overall_verdict,
         "problem_version": submission.problem_version,
         "test_case_results": test_case_results,
+        "ai_feedback_status": submission.ai_feedback_status,
+        "ai_feedback_text": submission.ai_feedback_text,
     }

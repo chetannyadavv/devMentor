@@ -76,6 +76,25 @@ services:
       - ./runner:/worker/runner:z
       - ./judge_workspaces:/workspaces:z
 
+  # Fully isolated from judging: separate container, separate Celery
+  # queue (ai_queue vs the default queue judge-worker uses), no Docker
+  # access at all. If this crashes or Claude's API is slow/down,
+  # judge-worker is completely unaffected -- proven by the queue split,
+  # not just asserted.
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://devmentor:${POSTGRES_PASSWORD}@postgres:5432/devmentor
+      CELERY_BROKER_URL: redis://redis:6379/0
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./app:/worker/app:z
+
   prometheus:
     image: prom/prometheus
     volumes:
@@ -95,21 +114,19 @@ services:
     depends_on:
       - prometheus
 
-  # The one public entry point. Automatic HTTPS via Let's Encrypt for a
-  # real DOMAIN; falls back to a locally-trusted self-signed cert for
-  # DOMAIN=localhost, so this works identically for local testing.
-  caddy:
+  # The one public entry point. Uses a manually-generated self-signed
+  # cert (Caddy's automatic-HTTPS produced a confirmed TLS handshake
+  # failure in this specific environment -- ruled out via direct A/B
+  # test against Nginx with the identical cert, which works cleanly).
+  nginx:
     build:
       context: .
-      dockerfile: Dockerfile.caddy
-    environment:
-      DOMAIN: ${DOMAIN}
+      dockerfile: Dockerfile.nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - api
 
@@ -117,5 +134,3 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
-  caddy_data:
-  caddy_config:
